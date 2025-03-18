@@ -49,26 +49,141 @@
     
     <h2>4. Code Implementation</h2>
     <pre><code>using UnityEngine;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
+using UnityEditor;
 
-public class LibraryLoader : MonoBehaviour
-{
-    public AssetReference libraryAsset;
-    
-    public void LoadLibrary()
+    public class AddressablesLNA : MonoBehaviour
     {
-        Addressables.LoadAssetAsync<GameObject>(libraryAsset).Completed += OnLibraryLoaded;
-    }
+        private LevelLibrary levelLibrary;
 
-    private void OnLibraryLoaded(AsyncOperationHandle<GameObject> obj)
-    {
-        if (obj.Status == AsyncOperationStatus.Succeeded)
+
+        public LevelLibrary AddressableLevelLibrary { get; private set; }
+
+        public bool isAccessoriesLibraryLoaded { get; private set; }
+
+        private bool isAddressablesLoaded = false;
+        private static HashSet<string> loadedAssets = new HashSet<string>();
+
+        public LevelLibrary LevelLibrary => levelLibrary ?? (levelLibrary = StaticVariables.levelLibrary);
+
+
+
+        private IEnumerator Start()
         {
-            Instantiate(obj.Result);
+            Debug.Log("Starting ContentManager Initialization");
+            LoadInitialLibraries();
+            yield return new WaitForSeconds(2f);
         }
-    }
-}</code></pre>
+
+        private void LoadInitialLibraries()
+        {
+            Debug.Log("Loading initial libraries from StaticVariables");
+            levelLibrary = GetLibrary<LevelLibrary>();
+        }
+
+        public static T GetLibrary<T>() where T : UnityEngine.Object
+        {
+            string typeName = typeof(T).Name;
+            var field = typeof(StaticVariables).GetField(typeName);
+            if (field != null)
+            {
+                T library = field.GetValue(null) as T;
+                if (library != null)
+                {
+                    Debug.Log($"Loaded {typeName} from StaticVariables.");
+                    return library;
+                }
+            }
+            Debug.LogWarning($"Library {typeName} is not loaded in StaticVariables.");
+            return null;
+        }
+
+        // Load any Library One by One according to you need 
+        public IEnumerator LoadLibraryFromAddressables<T>(bool ShouldLoadingScreen, string label, Action<T> onLibraryLoaded) where T : UnityEngine.Object
+        {
+
+            if (ShouldLoadingScreen)
+                UIManager.Instance.ShowLoadingScreen();
+            yield return new WaitForSeconds(1f);
+            Debug.Log($"Loading {typeof(T).Name} from Addressables with label: {label}");
+            AsyncOperationHandle<T> handle = Addressables.LoadAssetAsync<T>(label);
+            yield return handle;
+
+            yield return new WaitUntil(() => handle.IsDone);
+
+            if (handle.Status == AsyncOperationStatus.Succeeded)
+            {
+                Debug.Log($"Successfully loaded {typeof(T).Name} from Addressables.");
+                AssignLibrary(handle.Result);
+                loadedAssets.Add(label);
+                onLibraryLoaded?.Invoke(handle.Result);
+            }
+            else
+            {
+                Debug.LogError($"Failed to load {typeof(T).Name} from Addressables.");
+            }
+
+            //Addressables.Release(handle);
+            UIManager.Instance.HideLoadingScreen();
+        }
+
+        //Load all Library Under one Lable in Addressables
+        public IEnumerator LoadLibrariesFromAddressables(string label)
+        {
+            if (isAddressablesLoaded)
+            {
+                Debug.Log("Libraries are already loaded from Addressables. Skipping reload.");
+                yield break;
+            }
+
+            Debug.Log($"Loading libraries from Addressables with label: {label}");
+            isAddressablesLoaded = true;
+            AsyncOperationHandle<IList<UnityEngine.Object>> handle = Addressables.LoadAssetsAsync<UnityEngine.Object>(label, null);
+            yield return handle;
+            yield return new WaitUntil(() => handle.IsDone);
+
+            if (handle.Status == AsyncOperationStatus.Succeeded)
+            {
+                Debug.Log("Successfully loaded libraries from Addressables, assigning...");
+                foreach (var obj in handle.Result)
+                {
+                    AssignLibrary(obj);
+                }
+                Debug.Log("All libraries have been assigned from Addressables.");
+            }
+            else
+            {
+                Debug.LogError("Failed to load libraries from Addressables.");
+            }
+            //Addressables.Release(handle);
+        }
+
+
+        private void AssignLibrary(UnityEngine.Object obj)
+        {
+            Debug.Log($"Assigning library: {obj.GetType().Name}");
+            switch (obj)
+            {
+                case LevelLibrary lib: levelLibrary = lib; break;
+                default:
+                    Debug.LogWarning($"Unknown library type: {obj.GetType().Name}");
+                    break;
+            }
+        }
+
+        private T GetLibraryInstance<T>() where T : UnityEngine.Object
+        {
+            return typeof(T) switch
+            {
+                Type t when t == typeof(LevelLibrary) => AddressableLevelLibrary as T,
+                _ => null
+            };
+        }
+    }</code></pre>
     
     <h2>5. Addressables Release Management</h2>
     <p>Use <code>Addressables.Release(handle)</code> carefully. Once released, content cannot be retrieved unless stored separately or duplicated. Ensure complete usage before releasing.</p>
