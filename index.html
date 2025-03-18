@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sneaker Art Project - Addressable Implementation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        h1, h2, h3 {
+            color: #333;
+        }
+        pre {
+            background: #272822;
+            color: #f8f8f2;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        code {
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>Sneaker Art Project - Addressable Implementation</h1>
+    
+    <h2>1. Introduction</h2>
+    <p>The purpose of this document is to outline the implementation of <b>Unity Addressables</b> in the <b>Sneaker Art Project</b> to optimize asset loading and memory management.</p>
+    
+    <h2>2. Addressable Setup</h2>
+    <h3>2.1 Addressable Groups Configuration</h3>
+    <ul>
+        <li><b>Local Addressables:</b> Used to package assets required at the start of the game.</li>
+        <li><b>Separate Packs:</b> Each library or asset bundle is packed separately.</li>
+        <li><b>Compression:</b> LZ4 Compression is used for efficient loading.</li>
+    </ul>
+    
+    <h2>3. Implementation Strategy</h2>
+    <h3>3.1 Initial Asset Loading</h3>
+    <p>Basic data for the <b>Library</b> is stored in the project and loaded at game startup.</p>
+    
+    <h3>3.2 Dynamic Asset Loading</h3>
+    <p>When the <b>player completes the first level</b>, additional libraries are loaded <b>dynamically</b> as needed.</p>
+    
+    <h2>4. Code Implementation</h2>
+    <pre><code>using UnityEngine;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
+
+public class LibraryLoader : MonoBehaviour
+{
+    public AssetReference libraryAsset;
+    
+    public void LoadLibrary()
+    {
+        Addressables.LoadAssetAsync<GameObject>(libraryAsset).Completed += OnLibraryLoaded;
+    }
+
+    private void OnLibraryLoaded(AsyncOperationHandle<GameObject> obj)
+    {
+        if (obj.Status == AsyncOperationStatus.Succeeded)
+        {
+            Instantiate(obj.Result);
+        }
+    }
+}</code></pre>
+    
+    <h2>5. Addressables Release Management</h2>
+    <p>Use <code>Addressables.Release(handle)</code> carefully. Once released, content cannot be retrieved unless stored separately or duplicated. Ensure complete usage before releasing.</p>
+    
+    <h2>6. AddressablesLNA - Script Explanation</h2>
+    <p>The <b>AddressablesLNA</b> script is responsible for managing <b>dynamic loading of libraries</b> using Unity Addressables.</p>
+    
+    <h3>6.1 Key Functionalities</h3>
+    <pre><code>private IEnumerator Start()
+{
+    Debug.Log("Starting ContentManager Initialization");
+    LoadInitialLibraries();
+    yield return new WaitForSeconds(2f);
+}</code></pre>
+    
+    <h2>7. Benefits of Using Addressables</h2>
+    <ul>
+        <li><b>Efficient Memory Management:</b> Loads only required assets.</li>
+        <li><b>Improved Performance:</b> LZ4 compression allows faster decompression.</li>
+        <li><b>Scalability:</b> Enables modular asset loading.</li>
+    </ul>
+    
+    <h2>8. Challenges & Solutions</h2>
+    <table border="1" cellspacing="0" cellpadding="5">
+        <tr>
+            <th>Challenge</th>
+            <th>Solution</th>
+        </tr>
+        <tr>
+            <td>Initial delay in loading assets</td>
+            <td>Implemented asynchronous loading</td>
+        </tr>
+        <tr>
+            <td>High memory usage</td>
+            <td>Loaded assets one by one</td>
+        </tr>
+        <tr>
+            <td>Compression affecting quality</td>
+            <td>Chose LZ4 for balance</td>
+        </tr>
+    </table>
+    
+    <h2>9. Conclusion</h2>
+    <p>Implementing Addressables in <b>Sneaker Art Project</b> has significantly improved <b>performance, memory management, and scalability</b>. The ability to load libraries dynamically ensures an optimized gameplay experience.</p>
+</body>
+</html>
